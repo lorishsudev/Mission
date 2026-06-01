@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任務控平台 (MissionControl) - MVP PRD & 架構設計書 (v0.4)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        h1, h2, h3 { color: #1a202c; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+        h1 { font-size: 2.2em; color: #2b6cb0; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px; text-align: left; }
+        th { background-color: #edf2f7; }
+        pre { background: #2d3748; color: #f7fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-family: "Courier New", Courier, monospace; }
+        code { background: #edf2f7; color: #e53e3e; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+        .formula { background: #ebf8ff; border-left: 4px solid #3182ce; padding: 15px; font-style: italic; margin: 15px 0; }
+        .btn-copy { background: #3182ce; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; float: right; font-size: 0.85em; }
+        .btn-copy:hover { background: #2b6cb0; }
+        .clearfix::after { content: ""; clear: both; display: table; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 任務控平台 (MissionControl) - MVP PRD & 架構設計書</h1>
+    
+    <div class="card">
+        <h2>📌 變更日誌 (Change Log)</h2>
+        <p><strong>v0.4 (2026-06-01):</strong> 新增 5 個官方初始任務範例資料（完全無挑戰紀錄），包含 GPS 定位與問答規格，可直接作為 Seed Data 使用。</p>
+        <p><strong>v0.3 (2026-06-01):</strong> 技術棧精簡。將圖片儲存服務完全切換為 <strong>Supabase Storage</strong>，並設計後端下載原圖解析 EXIF 資訊的流向。</p>
+        <p><strong>v0.2 (2026-06-01):</strong> 調整 MVP 範疇。暫不開放外部使用者創建任務，全由官方手動預入，精簡後台。</p>
+        <p><strong>v0.1 (2026-05-23):</strong> 初始版本。樹狀三層架構（任務 ➔ 關卡 ➔ 挑戰）。</p>
+    </div>
+
+    <div class="card">
+        <h2>1. 專案願景與目標 (Vision & Goals)</h2>
+        <p>打造一個跨平台、去中心化的「現實生活任務/成就」遊戲化平台 (Gamification as a Service, GaaS)。</p>
+        <p><strong>MVP 階段核心策略：</strong>由官方主導內容生產，設計多關卡、結合地理位置與現地解謎的經典任務。使用者透過行動端 App 進行實地闖關、利用照片 GPS 與文字問答自動驗證，通關後可收集虛擬榮譽勳章並分享至個人網頁，以此驗證核心商業模式與用戶黏著度。</p>
+    </div>
+
+    <div class="card">
+        <h2>2. 系統架構與技術棧 (Tech Stack & Infrastructure)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>模組分工</th>
+                    <th>技術棧選型</th>
+                    <th>部署平台</th>
+                    <th>MVP 狀態</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>挑戰者行動端 App</strong></td>
+                    <td>React Native (Expo) (iOS / Android)</td>
+                    <td>Expo (EAS)</td>
+                    <td><span class="badge" style="background:#48bb78; color:white;">核心開發</span></td>
+                </tr>
+                <tr>
+                    <td><strong>個人紀錄與榮譽牆 Web</strong></td>
+                    <td>Next.js (提供外部公開分享網址，支援 RWD)</td>
+                    <td>Vercel</td>
+                    <td><span class="badge" style="background:#48bb78; color:white;">核心開發</span></td>
+                </tr>
+                <tr>
+                    <td><strong>後端服務與數據庫</strong></td>
+                    <td>Supabase (PostgreSQL + Auth 認證)</td>
+                    <td>Supabase Cloud</td>
+                    <td><span class="badge" style="background:#48bb78; color:white;">核心開發</span></td>
+                </tr>
+                <tr>
+                    <td><strong>圖片與檔案儲存</strong></td>
+                    <td><strong>Supabase Storage</strong> (建立 <code>challenge-uploads</code> 與 <code>badges</code> 儲存桶)</td>
+                    <td>Supabase Cloud</td>
+                    <td><span class="badge" style="background:#48bb78; color:white;">核心開發</span></td>
+                </tr>
+                <tr>
+                    <td><strong>任務管理/審核後台</strong></td>
+                    <td>Supabase Dashboard (直接操作 DB)</td>
+                    <td>Supabase</td>
+                    <td><span class="badge" style="background:#ed8936; color:white;">未來演進 (MVP僅留結構)</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="clearfix">
+            <button class="btn-copy" onclick="copyCode('sqlCode')">複製 SQL</button>
+            <h2>3. 領域模型與資料庫設計 (DB Schema)</h2>
+        </div>
+        <p>核心結構維持樹狀三層架構：<strong>任務 (Missions) ➔ 關卡 (Stages) ➔ 挑戰 (Challenges)</strong>。</p>
+        
+        <pre><code id="sqlCode">-- 1. 大任務表 (由官方手動預入)
+CREATE TABLE missions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,            
+    description TEXT,
+    badge_image_url VARCHAR(512),           -- 儲存於 Supabase Storage 'badges' bucket
+    bonus_perk_url VARCHAR(512),            -- (選填) 實體紀念品兌換或加購連結
+    status VARCHAR(50) DEFAULT 'published', -- published, draft, archived
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. 關卡表
+CREATE TABLE stages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mission_id UUID REFERENCES missions(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,            
+    sequence INT NOT NULL,                  -- 關卡排序 (1, 2, 3...)
+    is_sequential BOOLEAN DEFAULT TRUE,     -- 是否必須依序解鎖
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. 挑戰項目表 (最小驗證單元)
+CREATE TABLE challenges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stage_id UUID REFERENCES stages(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,            
+    type VARCHAR(50) NOT NULL,              -- 'GPS_PHOTO' 或 'TEXT_QUESTION'
+    -- 驗證條件欄位：使用 JSONB 確保未來類型擴充性
+    verification_criteria JSONB NOT NULL,   
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. 使用者任務整體進度表
+CREATE TABLE user_mission_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,                  -- 關聯至 Supabase Auth User
+    mission_id UUID REFERENCES missions(id) ON DELETE CASCADE,
+    status VARCHAR(50) DEFAULT 'in_progress', -- in_progress, completed
+    completed_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(user_id, mission_id)
+);
+
+-- 5. 使用者挑戰提交歷史紀錄表
+CREATE TABLE user_challenge_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
+    submitted_text TEXT,                    -- 問答題答案
+    submitted_file_url TEXT,                 -- 照片題 Supabase Storage 檔案網址
+    is_passed BOOLEAN DEFAULT FALSE,        -- 自動/手動驗證結果
+    verification_status VARCHAR(50) DEFAULT 'auto_verified', 
+    verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);</code></pre>
+    </div>
+
+    <div class="card">
+        <h2>4. MVP 核心業務邏輯與演算法規範</h2>
+        <h3>📌 挑戰者 App 端：原始照片上傳與驗證流程</h3>
+        <ul>
+            <li><strong>防作弊機制：</strong> App 調用原生相機上傳原圖至 Supabase Storage <code>challenge-uploads</code> 桶，不可進行任何消除 EXIF Metadata 的壓縮。</li>
+            <li><strong>後端解析：</strong> 後端服務（或 Edge Functions）下載該照片片段並利用套件提取 <code>GPSLatitude</code> 與 <code>GPSLongitude</code>。</li>
+        </ul>
+
+        <h3>📌 後端自動驗證邏輯：哈弗辛公式 (Haversine Formula)</h3>
+        <p>當挑戰類型為 <code>GPS_PHOTO</code> 時，計算照片經緯度 (lat1, lon1) 與目標點 (lat2, lon2) 的地球弧度距離 d：</p>
+        <div class="formula">
+            d = 2 * R * arcsin( sqrt( sin²(Δlat/2) + cos(lat1) * cos(lat2) * sin²(Δlon/2) ) )
+        </div>
+        <ul>
+            <li>地球平均半徑 <strong>R = 6,371,000 公尺</strong>。距離 <code>d</code> ≤ <code>radius_meters</code> 則判定通過。</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>5. MVP 官方任務範例資料集 (Seed Data Blueprint)</h2>
+        <p>以下為系統初始化手動預入之 5 個核心任務，皆不包含挑戰歷史紀錄：</p>
+
+        <h3>📋 任務 1：全台 10 大土地公廟巡禮</h3>
+        <p><strong>描述：</strong> 橫跨台灣北中南，尋訪香火最鼎盛、最具歷史與特色的 10 大土地公廟，解鎖發財好運氣！</p>
+        <ul>
+            <li><strong>關卡 1：烘爐地南山福德宮 (新北中和)</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在巨大土地公神像下合照。<code>{"latitude": 24.9715, "longitude": 121.4992, "radius_meters": 40}</code></li>
+                    <li>挑戰 2 (TEXT_QUESTION)：正殿旁的巨型元寶上寫了哪四個字？（提示：現地觀察）。<code>{"question": "元寶上的字是什麼？", "accepted_answers": ["時來運轉", "時來運轉"]}</code></li>
+                </ul>
+            </li>
+            <li><strong>關卡 2：車城福安宮 (屏東車城)</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在號稱全台最大土地公廟的正門牌樓前合照。<code>{"latitude": 22.0118, "longitude": 120.7102, "radius_meters": 50}</code></li>
+                    <li>挑戰 2 (TEXT_QUESTION)：福安宮著名的自動吸金「八角神明金爐」共有幾層？。<code>{"question": "金爐共有幾層？", "accepted_answers": ["4", "四", "四層"]}</code></li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>📋 任務 2：走讀高雄龍水里</h3>
+        <p><strong>描述：</strong> 走進高雄鼓山區的龍水里，探索愛河沿線與龍泉宮周邊的水圳歷史與人文足跡。</p>
+        <ul>
+            <li><strong>關卡 1：龍水化龍宮</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在化龍宮廟埕前拍照驗證。<code>{"latitude": 22.6534, "longitude": 120.2878, "radius_meters": 30}</code></li>
+                    <li>挑戰 2 (TEXT_QUESTION)：化龍宮主祀的神明是哪一位？。<code>{"question": "主祀神明是？", "accepted_answers": ["太子爺", "哪吒", "中壇元帥"]}</code></li>
+                </ul>
+            </li>
+            <li><strong>關卡 2：龍水里古老水圳遺址點</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在水圳意象紀念碑前拍照。<code>{"latitude": 22.6552, "longitude": 120.2891, "radius_meters": 20}</code></li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>📋 任務 3：電線桿號秘境尋寶</h3>
+        <p><strong>描述：</strong> 台灣電力公司的電線桿編號（電力座標）隱藏著精準的地理密碼，跟著達人指引找出藏在山林間的秘境！</p>
+        <ul>
+            <li><strong>關卡 1：黃金小鎮隱密起點</strong>
+                <ul>
+                    <li>挑戰 1 (TEXT_QUESTION)：找到起點的電線桿，請問上面的黑底黃字編號第二行前四碼是什麼？。<code>{"question": "電線桿第二行前四碼？", "accepted_answers": ["C812", "c812"]}</code></li>
+                </ul>
+            </li>
+            <li><strong>關卡 2：瀑布秘境入口</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在標有神秘電力座標「R9512 AA43」的電線桿旁與後方老樹合照。<code>{"latitude": 25.1012, "longitude": 121.8214, "radius_meters": 15}</code></li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>📋 任務 4：台北捷運公共藝術尋寶線</h3>
+        <p><strong>描述：</strong> 台北捷運不只是交通工具，更是地下美術館！找出特定車站內最經典的公共藝術作品。</p>
+        <ul>
+            <li><strong>關卡 1：大安森林公園站 (四季之舞)</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：與下凹庭院內的青蛙公共藝術雕像合照。<code>{"latitude": 25.0333, "longitude": 121.5358, "radius_meters": 25}</code></li>
+                </ul>
+            </li>
+            <li><strong>關卡 2：南港展覽館站 (快或慢)</strong>
+                <ul>
+                    <li>挑戰 1 (TEXT_QUESTION)：穿堂層大型互動藝術裝置「光之舞」，是由幾根會發光的 LED 柱狀體組成的？。<code>{"question": "LED柱共有幾根？", "accepted_answers": ["8", "八", "八根"]}</code></li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>📋 任務 5：台南府城四大名匾解謎</h3>
+        <p><strong>描述：</strong> 穿梭府城古蹟廟宇，仰望清代流傳至今、富含警世與歷史意義的台南四大名匾。</p>
+        <ul>
+            <li><strong>關卡 1：台灣首廟天壇 (一字匾)</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在天壇正殿前完成定位拍照。<code>{"latitude": 22.9934, "longitude": 120.2028, "radius_meters": 30}</code></li>
+                    <li>挑戰 2 (TEXT_QUESTION)：「一」字匾圍繞著許多小字，這些小字是在細數什麼？。<code>{"question": "圍繞的小字是在細數什麼？", "accepted_answers": ["千算萬算不由人", "算盤", "算盡"]}</code></li>
+                </ul>
+            </li>
+            <li><strong>關卡 2：台南府城隍廟 (爾來了)</strong>
+                <ul>
+                    <li>挑戰 1 (GPS_PHOTO)：在城隍廟大門抬頭拍下「爾來了」名匾。<code>{"latitude": 22.9919, "longitude": 120.2072, "radius_meters": 30}</code></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>6. 功能模組清單 (MVP Feature List)</h2>
+        <h3>📱 1. 挑戰者 App 端 (React Native - Expo)</h3>
+        <ul>
+            <li><strong>快速認證：</strong> 支援 Supabase Auth。</li>
+            <li><strong>任務市集：</strong> 探索上述 5 個由官方預設之經典任務。</li>
+            <li><strong>任務進度牆：</strong> 顯示樹狀關卡圖與鎖定狀態。</li>
+            <li><strong>現地挑戰互動：</strong> 支援 <code>GPS_PHOTO</code> 原圖上傳至 Supabase Storage 與 <code>TEXT_QUESTION</code> 即時回答。</li>
+        </ul>
+        <h3>🌐 2. 個人紀錄與榮譽牆 Web 端 (Next.js - RWD)</h3>
+        <ul>
+            <li><strong>數位榮譽牆：</strong> 提供 <code>/share/user/:userId</code> 網址展示勳章。</li>
+            <li><strong>挑戰歷程回溯：</strong> 使用者可回溯觀看過關時間與上傳自 Supabase Storage 的歷史相片。</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <div class="clearfix">
+            <button class="btn-copy" onclick="copyCode('promptCode')">複製 Prompt</button>
+            <h2>🤖 AI 開發指令集 (Prompt Template)</h2>
+        </div>
+        <pre><code id="promptCode">你現在是高階全端工程師兼系統架構師，請根據傳入的 v0.4 規格書開始模組化開發。
+此專案無前端創建者介面，請優先初始化 Supabase 資料庫與儲存桶（challenge-uploads, badges），並將規格書第 5 點的 5 個任務資料撰寫成 Seed SQL 腳本或 migration，確保系統啟動時就有這 5 個完整任務與關卡，且不帶任何挑戰紀錄。
+接著設計 Edge Functions 調用代碼，下載 Storage 照片並使用伺服器端套件解析 EXIF 定位資訊，與任務的 JSONB 條件進行 Haversine 公式比對。</code></pre>
+    </div>
+
+    <script>
+        function copyCode(id) {
+            const code = document.getElementById(id).innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('已複製到剪貼簿！');
+            }).catch(err => {
+                console.error('複製失敗: ', err);
+            });
+        }
+    </script>
+</body>
+</html>
