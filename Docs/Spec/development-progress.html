@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MissionControl - 開發進度追蹤與 Claude 銜接指南</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 960px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        h1 { color: #2b6cb0; border-bottom: 2px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #1a202c; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 32px; }
+        h3 { color: #2d3748; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px; text-align: left; vertical-align: top; }
+        th { background-color: #edf2f7; font-weight: 600; }
+        pre { background: #2d3748; color: #f7fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-family: "Courier New", Courier, monospace; font-size: 0.9em; }
+        code { background: #edf2f7; color: #e53e3e; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        .status-done    { background: #48bb78; color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; white-space: nowrap; }
+        .status-wip     { background: #ed8936; color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; white-space: nowrap; }
+        .status-todo    { background: #a0aec0; color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; white-space: nowrap; }
+        .status-future  { background: #9f7aea; color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; white-space: nowrap; }
+        .highlight { background: #ebf8ff; border-left: 4px solid #3182ce; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+        .warn { background: #fffbeb; border-left: 4px solid #f6ad55; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+        ul li { margin-bottom: 6px; }
+        .phase-header { display: flex; align-items: center; gap: 12px; }
+    </style>
+</head>
+<body>
+
+<h1>🗺️ MissionControl — 開發進度追蹤與 Claude 銜接指南</h1>
+<p><em>最後更新：2026-06-01　｜　此文件供 Claude Code 重啟後快速恢復上下文使用</em></p>
+
+<!-- ===== SECTION 1: 專案基本資訊 ===== -->
+<div class="card">
+    <h2>📌 專案基本資訊（重啟必讀）</h2>
+    <table>
+        <tr><th style="width:200px">項目</th><th>內容</th></tr>
+        <tr><td>專案名稱</td><td>MissionControl（任務控平台）</td></tr>
+        <tr><td>Spec 檔案</td><td><code>Docs/Spec/gemini-code-1780299273799.html</code>（v0.4，主要規格來源）</td></tr>
+        <tr><td>Supabase 專案</td><td><strong>Mission</strong>　ID: <code>xxhjpymymdsjzdmaaydg</code>　Region: ap-southeast-2</td></tr>
+        <tr><td>Supabase Org</td><td><code>ygjwafbgdkolfubzqsdr</code></td></tr>
+        <tr><td>DB Host</td><td><code>db.xxhjpymymdsjzdmaaydg.supabase.co</code>（PostgreSQL 17）</td></tr>
+        <tr><td>工作目錄</td><td><code>/Users/lorishsu/Desktop/Develope/Mission</code></td></tr>
+        <tr><td>技術棧</td><td>React Native (Expo) ＋ Next.js ＋ Supabase ＋ Supabase Storage</td></tr>
+    </table>
+</div>
+
+<!-- ===== SECTION 2: Claude Code 開發方式 ===== -->
+<div class="card">
+    <h2>🤖 Claude Code 開發方式（確認採用）</h2>
+    <div class="highlight">
+        <strong>建議工作流程（依序執行）：</strong>
+        <ol>
+            <li>用 <code>sc:workflow</code> 先根據 Spec 規劃各模組的開發順序</li>
+            <li>用 <code>sc:implement --c7</code> 實作各功能（Context7 補充 Expo / React Native 官方文件）</li>
+            <li>用 <code>sc:implement</code> 串接已建好的 Supabase tables</li>
+        </ol>
+    </div>
+    <p><strong>MCP 使用策略：</strong>無需額外安裝 Expo MCP，以下組合已足夠：</p>
+    <table>
+        <tr><th>MCP / Tool</th><th>用途</th><th>啟動方式</th></tr>
+        <tr><td>Context7 (<code>--c7</code>)</td><td>查詢 Expo SDK、React Native、Supabase JS 官方文件</td><td>指令加 <code>--c7</code> flag 或自動啟動</td></tr>
+        <tr><td>Sequential (<code>--seq</code>)</td><td>複雜邏輯分析（EXIF 解析、Haversine 驗證流程）</td><td><code>--think</code> / <code>--seq</code></td></tr>
+        <tr><td>Supabase MCP</td><td>直接操作 DB migration / 查 logs</td><td>已設定，直接使用</td></tr>
+    </table>
+</div>
+
+<!-- ===== SECTION 3: 已完成項目 ===== -->
+<div class="card">
+    <h2>✅ 已完成項目</h2>
+    <table>
+        <tr><th style="width:60px">狀態</th><th>項目</th><th>說明</th></tr>
+        <tr>
+            <td><span class="status-done">DONE</span></td>
+            <td>Supabase 專案建立</td>
+            <td>Mission 專案已建立並 ACTIVE（<code>xxhjpymymdsjzdmaaydg</code>）</td>
+        </tr>
+        <tr>
+            <td><span class="status-done">DONE</span></td>
+            <td>資料庫 Schema 建立（5 張表）</td>
+            <td>
+                <code>missions</code>、<code>stages</code>、<code>challenges</code>、<code>user_mission_progress</code>、<code>user_challenge_logs</code>
+                <br>migration name: <code>create_mission_core_tables</code>
+            </td>
+        </tr>
+        <tr>
+            <td><span class="status-done">DONE</span></td>
+            <td>範例 Seed Data 插入</td>
+            <td>
+                任務「台北捷運尋寶線」（3 關卡、6 挑戰）<br>
+                migration name: <code>insert_sample_data</code>
+            </td>
+        </tr>
+    </table>
+
+    <h3>📐 資料庫表結構速覽</h3>
+    <pre><code>missions          → title, description, badge_image_url, bonus_perk_url, status
+stages            → mission_id(FK), title, sequence, is_sequential
+challenges        → stage_id(FK), title, type(GPS_PHOTO|TEXT_QUESTION), verification_criteria(JSONB)
+user_mission_progress → user_id, mission_id(FK), status(in_progress|completed), completed_at
+user_challenge_logs   → user_id, challenge_id(FK), submitted_text, submitted_file_url, is_passed, verification_status</code></pre>
+
+    <h3>🌱 Seed Data 結構（台北捷運尋寶線）</h3>
+    <pre><code>Mission: 台北捷運尋寶線 (ID: a1b2c3d4-0000-0000-0000-000000000001)
+├── Stage 1：捷運大安森林公園站 (sequence=1)
+│   ├── GPS_PHOTO：與大安森林公園入口公共藝術品合照
+│   └── TEXT_QUESTION：雕像基座寫了哪四個字？→ ["光輝歲月","光輝"]
+├── Stage 2：捷運中正紀念堂站 (sequence=2)
+│   ├── GPS_PHOTO：在中正紀念堂大門前拍照
+│   └── TEXT_QUESTION：衛兵交接每幾分鐘？→ ["60","60分鐘","一小時"]
+└── Stage 3：捷運西門站 (sequence=3)
+    ├── GPS_PHOTO：在西門紅樓前拍照
+    └── TEXT_QUESTION：西門紅樓建於哪一年？→ ["1908","1908年","民國前四年"]</code></pre>
+</div>
+
+<!-- ===== SECTION 4: 開發階段計畫 ===== -->
+<div class="card">
+    <h2>🗂️ 開發階段計畫（全覽）</h2>
+    <table>
+        <tr><th style="width:80px">狀態</th><th style="width:120px">階段</th><th>模組／任務</th><th>Claude 指令建議</th></tr>
+
+        <tr>
+            <td><span class="status-done">DONE</span></td>
+            <td>Phase 0<br>基礎建設</td>
+            <td>Supabase 建表、Seed Data</td>
+            <td>已完成，無需重做</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 1<br>Expo 初始化</td>
+            <td>
+                建立 Expo 專案（<code>npx create-expo-app</code>）<br>
+                安裝 Supabase JS client、React Navigation、NativeWind<br>
+                設定 <code>.env</code>（SUPABASE_URL、SUPABASE_ANON_KEY）
+            </td>
+            <td><code>sc:implement --c7</code><br>關鍵字：Expo Router v3, NativeWind, supabase-js</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 2<br>使用者認證</td>
+            <td>
+                Supabase Auth 整合（Email / Magic Link）<br>
+                登入、註冊、登出畫面<br>
+                Auth Session 持久化（AsyncStorage）
+            </td>
+            <td><code>sc:implement --c7</code><br>關鍵字：supabase auth expo, session persistence</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 3<br>任務列表</td>
+            <td>
+                從 <code>missions</code> 拉取任務清單<br>
+                卡片式 UI 顯示（標題、描述、勳章圖）<br>
+                任務詳情頁（關卡樹狀圖）
+            </td>
+            <td><code>sc:implement --c7</code><br>關鍵字：FlatList, Supabase realtime</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 4<br>關卡解鎖邏輯</td>
+            <td>
+                讀取 <code>user_mission_progress</code> 與 <code>user_challenge_logs</code><br>
+                根據 <code>is_sequential</code> 判斷關卡是否可進入<br>
+                進度圓圈 / 鎖頭 UI
+            </td>
+            <td><code>sc:implement</code>（串接 Supabase tables）</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 5<br>GPS_PHOTO 挑戰</td>
+            <td>
+                呼叫原生相機（<code>expo-camera</code> 或 <code>expo-image-picker</code>）<br>
+                上傳原圖（含 EXIF）至 Supabase Storage <code>challenge-uploads</code> bucket<br>
+                後端 Edge Function 解析 EXIF → Haversine 驗證<br>
+                寫入 <code>user_challenge_logs</code>
+            </td>
+            <td>
+                <code>sc:implement --c7 --seq</code><br>
+                關鍵字：expo-camera EXIF, Supabase Storage upload, Edge Function EXIF parse, Haversine formula
+            </td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 6<br>TEXT_QUESTION 挑戰</td>
+            <td>
+                文字輸入 UI<br>
+                比對 <code>verification_criteria.accepted_answers</code>（模糊比對）<br>
+                寫入 <code>user_challenge_logs</code>
+            </td>
+            <td><code>sc:implement</code>（串接 Supabase）</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 7<br>任務完成與勳章</td>
+            <td>
+                偵測所有 challenges 均 <code>is_passed=true</code> 後更新 <code>user_mission_progress.status=completed</code><br>
+                勳章展示動畫（Lottie 或 Reanimated）<br>
+                從 Supabase Storage <code>badges</code> bucket 載入勳章圖
+            </td>
+            <td><code>sc:implement --c7</code><br>關鍵字：Lottie expo, Reanimated badge animation</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-todo">TODO</span></td>
+            <td>Phase 8<br>Next.js 榮譽牆</td>
+            <td>
+                建立 Next.js 專案<br>
+                路由 <code>/share/user/[userId]</code> 公開展示勳章<br>
+                Server-side 讀取 Supabase（Service Role）<br>
+                SEO / OG 圖片設定（分享用）
+            </td>
+            <td><code>sc:implement --c7</code><br>關鍵字：Next.js App Router, Supabase SSR, og:image</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-future">FUTURE</span></td>
+            <td>Phase 9<br>後台管理</td>
+            <td>使用 Supabase Dashboard 直接管理任務資料（MVP 不做前端後台）</td>
+            <td>未來演進，MVP 不開發</td>
+        </tr>
+
+        <tr>
+            <td><span class="status-future">FUTURE</span></td>
+            <td>Phase 10<br>人工審核</td>
+            <td><code>user_challenge_logs.verification_status</code> 已預留 <code>pending_review / manual_approved / manual_rejected</code></td>
+            <td>未來演進</td>
+        </tr>
+    </table>
+</div>
+
+<!-- ===== SECTION 5: Supabase Storage 架構 ===== -->
+<div class="card">
+    <h2>🗄️ Supabase Storage 架構（待建立）</h2>
+    <div class="warn">⚠️ 以下兩個 Storage Bucket 尚未建立，需在 Phase 1 後執行。</div>
+    <table>
+        <tr><th>Bucket 名稱</th><th>用途</th><th>存取策略建議</th></tr>
+        <tr>
+            <td><code>challenge-uploads</code></td>
+            <td>使用者上傳的挑戰原圖（含 EXIF）</td>
+            <td>僅登入用戶可上傳（本人），Service Role 可讀取（後端驗證用）</td>
+        </tr>
+        <tr>
+            <td><code>badges</code></td>
+            <td>任務通關勳章圖片（官方設計稿）</td>
+            <td>公開讀取（Public）</td>
+        </tr>
+    </table>
+    <p>建立指令（Claude 可直接執行）：</p>
+    <pre><code>-- 透過 Supabase MCP 建立 Bucket
+-- mcp__supabase__apply_migration 執行對應 Storage API 呼叫
+-- 或直接在 Supabase Dashboard → Storage 手動建立</code></pre>
+</div>
+
+<!-- ===== SECTION 6: 核心驗證邏輯速查 ===== -->
+<div class="card">
+    <h2>⚙️ 核心驗證邏輯速查（Edge Function 開發參考）</h2>
+    <h3>GPS_PHOTO 驗證流程</h3>
+    <ol>
+        <li>App 上傳原圖 → <code>challenge-uploads/{userId}/{challengeId}/{timestamp}.jpg</code></li>
+        <li>Edge Function 觸發：下載照片 → 用 <code>exifr</code> 套件解析 <code>GPSLatitude</code>、<code>GPSLongitude</code></li>
+        <li>Haversine 公式計算距離 d（公尺），與 <code>verification_criteria.radius_meters</code> 比較</li>
+        <li>d ≤ radius_meters → <code>is_passed = true</code></li>
+    </ol>
+    <pre><code>// Haversine 公式（TypeScript）
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6_371_000; // 地球半徑（公尺）
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}</code></pre>
+
+    <h3>TEXT_QUESTION 驗證邏輯</h3>
+    <pre><code>// 驗證答案（去除空白、轉小寫模糊比對）
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
+const isCorrect = criteria.accepted_answers.some(
+  (ans: string) => normalize(submittedText) === normalize(ans)
+);</code></pre>
+</div>
+
+<!-- ===== SECTION 7: 下一步指引 ===== -->
+<div class="card">
+    <h2>▶️ 下一步：Claude 重啟後請從這裡繼續</h2>
+    <div class="highlight">
+        <strong>當前進度：Phase 0 完成，下一步為 Phase 1（Expo 初始化）</strong>
+    </div>
+    <p>重啟後建議先執行：</p>
+    <pre><code>sc:workflow  → 根據此文件（development-progress.html）與 Spec（v0.4）生成 Expo App 分模組開發計畫
+sc:implement --c7  → 從 Phase 1 開始：Expo 專案初始化 + Supabase client 設定</code></pre>
+
+    <p>銜接 prompt 範本：</p>
+    <pre><code>請讀取 Docs/Spec/development-progress.html 與 Docs/Spec/gemini-code-1780299273799.html，
+目前已完成 Phase 0（Supabase 建表 + Seed Data），
+Supabase 專案 ID: xxhjpymymdsjzdmaaydg，
+請繼續從 Phase 1 開始開發 Expo App。</code></pre>
+</div>
+
+</body>
+</html>
